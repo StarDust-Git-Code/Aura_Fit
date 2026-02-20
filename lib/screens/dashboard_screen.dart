@@ -75,7 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               color: AppTheme.neonCyan,
                               shadows: [
                                 Shadow(
-                                  color: AppTheme.neonCyan.withOpacity(0.5),
+                                  color: AppTheme.neonCyan.withValues(alpha: 0.5),
                                   blurRadius: 20,
                                 ),
                               ],
@@ -163,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 color: statusColor,
                                 shadows: [
                                   Shadow(
-                                    color: statusColor.withOpacity(0.5),
+                                    color: statusColor.withValues(alpha: 0.5),
                                     blurRadius: 10,
                                   ),
                                 ],
@@ -186,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               child: Container(
                 padding: const EdgeInsets.only(top: 16, right: 16),
                 decoration: BoxDecoration(
-                  color: AppTheme.cardSurface.withOpacity(0.5),
+                  color: AppTheme.cardSurface.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.white10),
                 ),
@@ -202,7 +202,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         titlesData: FlTitlesData(show: false),
                         borderData: FlBorderData(show: false),
                         minX: 0,
-                        maxX: 100, // Fixed window size
+                        maxX: 100,
                         minY: provider.rawHistory.reduce((a, b) => a < b ? a : b) - 100,
                         maxY: provider.rawHistory.reduce((a, b) => a > b ? a : b) + 100,
                         lineBarsData: [
@@ -223,8 +223,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               show: true,
                               gradient: LinearGradient(
                                 colors: [
-                                  AppTheme.neonCyan.withOpacity(0.2),
-                                  AppTheme.vibrantPurple.withOpacity(0.0),
+                                  AppTheme.neonCyan.withValues(alpha: 0.2),
+                                  AppTheme.vibrantPurple.withValues(alpha: 0.0),
                                 ],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -238,6 +238,58 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             ),
+
+            const SizedBox(height: 12),
+
+            // Recommendation Card
+            Consumer<BleProvider>(
+              builder: (context, provider, child) {
+                if (provider.recommendation.isEmpty) return const SizedBox.shrink();
+
+                Color cardColor;
+                IconData cardIcon;
+                switch (provider.anxietyStatus) {
+                  case "CALM":
+                    cardColor = Colors.greenAccent;
+                    cardIcon = Icons.favorite;
+                    break;
+                  case "ELEVATED":
+                    cardColor = Colors.orangeAccent;
+                    cardIcon = Icons.warning_amber_rounded;
+                    break;
+                  default: // HIGH
+                    cardColor = Colors.redAccent;
+                    cardIcon = Icons.emergency;
+                }
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 500),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: cardColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: cardColor.withValues(alpha: 0.5), width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(cardIcon, color: cardColor, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          provider.recommendation,
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -247,12 +299,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildGlassCard(BuildContext context, {required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.cardSurface.withOpacity(0.8), // Glass-like background
+        color: AppTheme.cardSurface.withValues(alpha: 0.8), // Glass-like background
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

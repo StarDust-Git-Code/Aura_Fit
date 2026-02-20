@@ -1,39 +1,43 @@
 class MathLogic {
-  /// Calculates Stress Level percentage (0-100) based on BPM.
-  /// 
-  /// Logic:
-  /// - BPM < 60: 0-10% (Resting/Low)
-  /// - 60 <= BPM < 80: 10-30% (Normal)
-  /// - 80 <= BPM < 100: 30-60% (Elevated)
-  /// - 100 <= BPM < 120: 60-90% (High)
-  /// - BPM >= 120: 90-100% (Extreme)
+  /// Maps BPM → Stress % (0–100).
   static double calculateStress(int bpm) {
     if (bpm < 60) {
-      return ((bpm / 60) * 10).clamp(0.0, 10.0); 
+      return (bpm / 60 * 10).clamp(0.0, 10.0);
     } else if (bpm < 80) {
-      // Map 60-80 to 10-30
-      return 10 + (((bpm - 60) / 20) * 20);
+      return 10 + ((bpm - 60) / 20 * 20);
     } else if (bpm < 100) {
-      // Map 80-100 to 30-60
-      return 30 + (((bpm - 80) / 20) * 30);
+      return 30 + ((bpm - 80) / 20 * 30);
     } else if (bpm < 120) {
-      // Map 100-120 to 60-90
-      return 60 + (((bpm - 100) / 20) * 30);
+      return 60 + ((bpm - 100) / 20 * 30);
     } else {
-      // Map 120+ to 90-100, max 100
-      double val = 90 + (((bpm - 120) / 40) * 10);
-      return val > 100 ? 100.0 : val;
+      return (90 + ((bpm - 120) / 40 * 10)).clamp(0.0, 100.0);
     }
   }
 
-  /// Determines Anxiety Status based on Stress Level.
+  /// Maps Stress % → Anxiety label.
   static String determineAnxiety(double stressLevel) {
-    if (stressLevel < 30) {
-      return "CALM";
-    } else if (stressLevel < 70) {
-      return "ELEVATED";
-    } else {
-      return "HIGH";
+    if (stressLevel < 30) return "CALM";
+    if (stressLevel < 70) return "ELEVATED";
+    return "HIGH";
+  }
+
+  /// Returns a personalized recovery recommendation.
+  static String getRecommendation(String anxietyStatus, int bpm) {
+    switch (anxietyStatus) {
+      case "CALM":
+        return "You're doing great! Keep up your healthy rhythm. 💚";
+      case "ELEVATED":
+        if (bpm > 100) {
+          return "Try box-breathing: inhale 4s → hold 4s → exhale 4s. 🧘";
+        }
+        return "Take a short break. Drink water and stretch. 🌿";
+      case "HIGH":
+        if (bpm > 130) {
+          return "Stop activity immediately. Sit down, breathe slowly, and rest. 🚨";
+        }
+        return "Emergency: Practice slow deep breaths (5s in, 5s out). Seek calm. 🆘";
+      default:
+        return "";
     }
   }
 }

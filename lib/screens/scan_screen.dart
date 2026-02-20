@@ -77,7 +77,7 @@ class ScanScreen extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: isTarget 
-                          ? AppTheme.neonCyan.withOpacity(0.1) 
+                          ? AppTheme.neonCyan.withValues(alpha: 0.1) 
                           : AppTheme.cardSurface,
                       borderRadius: BorderRadius.circular(12),
                       border: isTarget 

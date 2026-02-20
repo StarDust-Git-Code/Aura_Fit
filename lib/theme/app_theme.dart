@@ -18,7 +18,6 @@ class AppTheme {
         primary: neonCyan,
         secondary: vibrantPurple,
         surface: darkBackground,
-        background: darkBackground,
         error: Colors.redAccent,
       ),
       textTheme: TextTheme(

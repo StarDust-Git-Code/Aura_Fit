@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/math_logic.dart';
+import '../services/notification_service.dart';
 
 class BleProvider with ChangeNotifier {
   // UUIDs
@@ -15,15 +16,20 @@ class BleProvider with ChangeNotifier {
   bool _isScanning = false;
   bool _isConnected = false;
   BluetoothDevice? _connectedDevice;
-  
+
   // Vitals
   int _bpm = 0;
   int _rawSensorValue = 0;
-  List<double> _rawHistory = []; // For charting
+  List<double> _rawHistory = [];
   double _stressLevel = 0.0;
   String _anxietyStatus = "CALM";
+  String _recommendation = "";
 
-  // Stream Subscription
+  // Emergency alert debouncing
+  DateTime? _lastNotificationTime;
+  static const Duration _notifCooldown = Duration(minutes: 2);
+
+  // Stream Subscriptions
   StreamSubscription<List<int>>? _dataSubscription;
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
 
@@ -35,19 +41,19 @@ class BleProvider with ChangeNotifier {
   double get stressLevel => _stressLevel;
   String get anxietyStatus => _anxietyStatus;
   List<double> get rawHistory => _rawHistory;
+  String get recommendation => _recommendation;
 
-  // Permissions
+  // ─── Permissions ───────────────────────────────────────────────────────────
   Future<bool> checkPermissions() async {
-    // Android 12+
     if (await Permission.bluetoothScan.request().isDenied) return false;
     if (await Permission.bluetoothConnect.request().isDenied) return false;
-    // Location (Often needed for older scanning)
     if (await Permission.location.request().isDenied) return false;
-    
+    // Notification permission (Android 13+)
+    await Permission.notification.request();
     return true;
   }
 
-  // Scanning
+  // ─── Scanning ──────────────────────────────────────────────────────────────
   Future<void> startScan() async {
     if (!await checkPermissions()) return;
 
@@ -75,10 +81,10 @@ class BleProvider with ChangeNotifier {
 
   Stream<List<ScanResult>> get scanResults => FlutterBluePlus.scanResults;
 
-  // Connection
+  // ─── Connection ────────────────────────────────────────────────────────────
   Future<void> connect(BluetoothDevice device) async {
     _isScanning = false;
-    FlutterBluePlus.stopScan(); // Ensure scan is stopped
+    FlutterBluePlus.stopScan();
 
     try {
       await device.connect();
@@ -93,7 +99,6 @@ class BleProvider with ChangeNotifier {
       });
 
       await _discoverServices(device);
-
     } catch (e) {
       debugPrint("Connection Error: $e");
       disconnect();
@@ -109,11 +114,12 @@ class BleProvider with ChangeNotifier {
     _bpm = 0;
     _stressLevel = 0.0;
     _anxietyStatus = "CALM";
+    _recommendation = "";
     _rawHistory.clear();
     notifyListeners();
   }
 
-  // Service Discovery & Data Parsing
+  // ─── Service Discovery ─────────────────────────────────────────────────────
   Future<void> _discoverServices(BluetoothDevice device) async {
     List<BluetoothService> services = await device.discoverServices();
     for (var service in services) {
@@ -121,38 +127,38 @@ class BleProvider with ChangeNotifier {
         for (var characteristic in service.characteristics) {
           if (characteristic.uuid.toString().toUpperCase().contains(charUUID)) {
             await characteristic.setNotifyValue(true);
-            _dataSubscription = characteristic.lastValueStream.listen((value) {
-              _parseData(value);
-            });
-            // Also listen to onValueReceived if needed, but lastValueStream is usually sufficient with setNotifyValue
+            _dataSubscription = characteristic.lastValueStream.listen(_parseData);
           }
         }
       }
     }
   }
 
+  // ─── Data Parsing ──────────────────────────────────────────────────────────
   void _parseData(List<int> data) {
     if (data.isEmpty) return;
-    
-    // Expecting UTF-8 string: "BPM:85,RAW:3150"
-    String receivedString = utf8.decode(data);
-    
-    // Simple parsing logic
-    // You might need a more robust parser depending on real data cleanliness
+
     try {
-      List<String> parts = receivedString.split(',');
+      final String received = utf8.decode(data);
+      final List<String> parts = received.split(',');
+
       for (String part in parts) {
         if (part.startsWith("BPM:")) {
           _bpm = int.tryParse(part.split(':')[1]) ?? _bpm;
         } else if (part.startsWith("RAW:")) {
           _rawSensorValue = int.tryParse(part.split(':')[1]) ?? _rawSensorValue;
-          _updateRawHistory(_rawSensorValue.toDouble());
+          _rawHistory.add(_rawSensorValue.toDouble());
+          if (_rawHistory.length > 100) _rawHistory.removeAt(0);
         }
       }
 
-      // Calculate Vitals
+      // Compute vitals
       _stressLevel = MathLogic.calculateStress(_bpm);
       _anxietyStatus = MathLogic.determineAnxiety(_stressLevel);
+      _recommendation = MathLogic.getRecommendation(_anxietyStatus, _bpm);
+
+      // Trigger emergency notification if needed
+      _maybeNotify();
 
       notifyListeners();
     } catch (e) {
@@ -160,10 +166,30 @@ class BleProvider with ChangeNotifier {
     }
   }
 
-  void _updateRawHistory(double value) {
-    _rawHistory.add(value);
-    if (_rawHistory.length > 100) { // Keep last 100 points for chart
-      _rawHistory.removeAt(0);
+  // ─── Emergency Notifications ───────────────────────────────────────────────
+  void _maybeNotify() {
+    final bool isEmergency = _anxietyStatus == "HIGH" || _bpm > 130;
+    if (!isEmergency) return;
+
+    final now = DateTime.now();
+    if (_lastNotificationTime != null &&
+        now.difference(_lastNotificationTime!) < _notifCooldown) {
+      return; // Debounce: don't spam
     }
+
+    _lastNotificationTime = now;
+
+    String title;
+    String body;
+
+    if (_bpm > 130) {
+      title = "⚠️ High Heart Rate Alert!";
+      body = "Your BPM is dangerously high ($_bpm). $_recommendation";
+    } else {
+      title = "🚨 High Anxiety Detected!";
+      body = "Stress level is ${_stressLevel.toInt()}%. $_recommendation";
+    }
+
+    NotificationService.showEmergencyNotification(title: title, body: body);
   }
 }
